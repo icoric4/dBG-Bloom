@@ -17,7 +17,7 @@ public:
 	set<string> P;
 	set<string> cFP;
 	vector<string> nodes;
-	map<string,bool> marked;
+	set<string> marked;
 	int k_size;
 	set<string> contigs;
 
@@ -126,87 +126,132 @@ public:
 			int reason;
 
 			do {
-				// branch to next front
-				// cout << depth << ": FRONT" << " "; 
-				// for (set<string>::iterator it = front.begin(); it != front.end(); ++it)
-				// 	cout << *it << " ";
-				// cout << endl;
 				set<string> new_front;
 				for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
-					if (!marked.count((*it).substr((*it).size()-k_size))) {
+					bool l = true, r = true;
+
+					if (marked.count((*it).substr((*it).size()-k_size))) {
+						r = false;
+					}
+					if (marked.count((*it).substr(0,k_size))) {
+						l = false;
+					}
+					if (!l && !r){
 						continue;
 					}
-					set<string> ret = branch(*it);
+					set<string> ret = branch(*it, l, r);
 					new_front.insert(ret.begin(), ret.end());
-					marked.insert(pair<string,bool>((*it).substr((*it).size()-k_size),true));
-					marked.insert(pair<string,bool>((*it).substr(0,k_size),true));
-					marked.insert(pair<string,bool>(reverse_complement((*it).substr((*it).size()-k_size)),true));
-					marked.insert(pair<string,bool>(reverse_complement((*it).substr(0,k_size)),true));
 				}
-				if(new_front.size() == 0) {
-					reason = 2;
+				for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
+					bool l = true, r = true;
+
+					if (marked.count((*it).substr((*it).size()-k_size))) {
+						r = false;
+					}
+					if (marked.count((*it).substr(0,k_size))) {
+						l = false;
+					}
+					if (!l && !r){
+						continue;
+					}
+
+					if (r) {
+						marked.insert((*it).substr((*it).size()-k_size));
+						marked.insert(reverse_complement((*it).substr((*it).size()-k_size)));
+					}
+					if (l) {
+						marked.insert((*it).substr(0,k_size));
+						marked.insert(reverse_complement((*it).substr(0,k_size)));
+					}
+				}
+
+				if(new_front.empty()) {
+					reason = -1;
 					break;
 				}
 				depth++;
 				front = new_front;
-				// cout << depth <<": NEW_FRONT" << " "; 
-				// for (set<string>::iterator it = front.begin(); it != front.end(); ++it)
-				// 	cout << *it << " ";
-				// cout << endl;
-				// if (depth == 40) 
-				// 	exit(1);
+
 				int width = new_front.size();
 
 				if (depth > 500 || width > 20) {
 					reason = 0;
 					break;
 				}
-				if (new_front.size() == 1 && depth > 2*k_size+1) {
-					
+				if (new_front.size() == 1) {
+					bool r = true, l = true;
+					if (marked.count((*new_front.begin()).substr((*new_front.begin()).size()-k_size))) {
+						r = false;
+					}
+					if (marked.count((*new_front.begin()).substr(0,k_size))) {
+						l = false;
+					}
+					int bla;
+					set<string> ret = branch(*(new_front.begin()), l, r);
+					if (ret.size() >= 1) {
+						continue;
+					}
 					reason = 1;
 					break;
 				}
 			} while (1);
 
-			for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
-				if ((*it).size()>2*k_size+1) {
-					contigs.insert(*it);
+			if (reason != -1) {
+				for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
+					if ((*it).size() > 2*k_size + 1) {
+						contigs.insert(*it);
+					}
 				}
 			}
 
 			index++;
 			for (int i = index; i < nodes.size(); ++i) {
-				if(!marked[nodes[i]]) {
+				if(!marked.count(nodes[i])) {
 					index = i;
 					break;
 				}
-			} 
+			}
 		}
 	}
 
-	set<string> branch(string s) {
+	set<string> branch(string s, bool left, bool right) {
 
 		char bla[4] = {'A', 'C', 'G', 'T'};
 		list<char> l(bla, bla + sizeof(bla) / sizeof(char));
 		set<string> ret;
-		// cout << "1: " << s;
-		for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
-			if (filter.contains(*c+s.substr(0,k_size-1)) && 
-				!cFP.count(canonical(*c+s.substr(0,k_size-1)))&&
-				!marked.count(*c+s.substr(0,k_size-1)) ) {
-				ret.insert(*c+s);
+		set<string> tmp;
+
+		if (left && right) {
+			for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
+				string h = *c + s.substr(0, k_size - 1);
+				if (left && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
+					tmp.insert(*c + s);
+				}
 			}
-			if (filter.contains(s.substr(s.size()-k_size+1)+*c) && 
-				!cFP.count(canonical(s.substr(s.size()-k_size+1)+*c)) &&
-				!marked.count(s.substr(s.size()-k_size+1)+*c)) {
-				ret.insert(s+*c);
-			}	
+			for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
+				for (set<string>::iterator it = tmp.begin(); it != tmp.end(); ++it) {
+					string h = (*it).substr((*it).size() - k_size + 1) + *c;
+					if (right && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
+						ret.insert((*it) + *c);
+					}
+				}
+			}
+		} else if (left) {
+			for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
+				string h = *c + s.substr(0, k_size - 1);
+				if (left && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
+					ret.insert(*c + s);
+				}
+			}
+		} else if (right) {
+			for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
+				string h = s.substr(s.size() - k_size + 1) + *c;
+				if (right && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
+					ret.insert(s + *c);
+				}
+			}
 		}
-		// cout << " 2: ";
-		// for (auto r: ret) {
-		// 	cout << r << " ";
-		// }
-		// cout << endl;
+
 		return ret;
 	}
 
