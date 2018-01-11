@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 		string seq;
 		int count;
 		while ( ifs >> c >> count >> seq)	{
-			if (count >= 2) {
+			if (count >= 1) {
 				of << seq << "\n";
 			}
 		}

@@ -1,3 +1,6 @@
+#ifndef DBG_BLOOM_DBG_HPP
+#define DBG_BLOOM_DBG_HPP
+
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -17,8 +20,9 @@ class dbg {
 public: 
 
 	dbg(string name);
-	void compute_cFP(unsigned int M);
-	void traverse_graph();
+	void compute_cFP(unsigned int M=1e9);
+	void traverse_graph(string name="contigs.txt");
+	string reverse_complement (string s);
 
 private:
 	string input_file_name;
@@ -34,8 +38,8 @@ private:
 	void compute_P();
 	set<string> branch(string s, bool left, bool right);
 	string canonical (string s1);
-	string reverse_complement (string s);
 	string complement(string c);
 };
 
+#endif //DBG_HPP
 
