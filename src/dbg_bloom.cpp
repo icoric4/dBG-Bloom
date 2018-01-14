@@ -9,9 +9,8 @@ dbg::dbg(string name) {
     ifstream ifs(name);
     string s;
     while (ifs >> s) {
-        S.insert(s);
+        S.push_back(s);
     }
-    vector<bool> bla(S.size(), false);
     k_size = (*S.begin()).size();
     create_BF();
 }
@@ -20,15 +19,13 @@ dbg::dbg(string name) {
  * Method for creation of bloom filter and adding all solid k-mers in the filter.
  */
 void dbg::create_BF() {
-    bloom_parameters parameters;
-    parameters.projected_element_count = S.size();
-    parameters.false_positive_probability = 0.0001;
-    parameters.random_seed = 0xA5A5A5A5;
-    parameters.compute_optimal_parameters();
-    filter = bloom_filter(parameters);
-    for (set<string>::iterator it = S.begin(); it != S.end(); ++it)	{
-        filter.insert(*it);
-        filter.insert(reverse_complement(*it));
+    const unsigned k = k_size;
+    const unsigned numHashes = 10;
+    const unsigned size = 1e9;
+    filter = KmerBloomFilter(size, numHashes, k);
+    for (int i = 0; i != S.size(); ++i)	{
+        filter.insert(S[i].c_str());
+        filter.insert(reverse_complement(S[i]).c_str());
     }
 }
 
@@ -36,24 +33,37 @@ void dbg::create_BF() {
  * Method for calculation of set P which represents the set of all extensions of
  * set S for which the Bloom filter answers yes.
  */
-void dbg::compute_P() {
+vector<string> dbg::compute_P() {
     string h[] = {"A","C","G","T"};
-    set<string> nucleotides(h, h+4);
-    for (set<string>::iterator it = S.begin(); it != S.end(); ++it)	{
-        string prefix = (*it).substr(0, (*it).size()-1);
-        string sufix = (*it).substr(1);
-        for (set<string>::iterator nucl = nucleotides.begin(); nucl != nucleotides.end(); ++nucl) {
-
-            if (filter.contains(sufix + *nucl)) {
-                P.insert(canonical(sufix + *nucl));
+    char hc[] = {'A', 'C', 'G', 'T'};
+    unordered_set<string> P;
+    stringstream ss;
+    char end; 
+    string start;
+    for (int i = 0; i != S.size(); ++i) { // a bit uglier code to avoid usage of string::operator+ to save time
+        end = S[i][(S[i].size()-1)];
+        ss << S[i][0];
+        ss >> start;
+        for (int j = 0; j != 4; ++j) {
+            S[i].pop_back();
+            S[i].insert(0,h[j]);
+            if (filter.contains(S[i].c_str())) {
+                P.insert(canonical(S[i]));
             }
+            S[i].erase(S[i].begin());
+            S[i].push_back(end);
 
-            if (filter.contains(*nucl + prefix)) {
-                P.insert(canonical(*nucl + prefix));
+            S[i].erase(S[i].begin());
+            S[i].push_back(hc[j]);
+            if (filter.contains(S[i].c_str())) {
+                P.insert(canonical(S[i]));
             }
+            S[i].pop_back();
+            S[i].insert(0,start);
         }
     }
-    //cout << S.size() << " " << P.size() << endl;
+    vector<string> ret(P.begin(),P.end());
+    return ret;
 }
 
 /*
@@ -61,33 +71,32 @@ void dbg::compute_P() {
  * formally defined as cFP = P\S
  */
 void dbg::compute_cFP(unsigned int M) {
-    compute_P();
-    set<string> D(P);
-    set<string>::iterator it = S.begin();
-    //int i = 0;
-    while(it != S.end()) {
-        set<string> Pi;
-        set<string> Dn;
-        //cout << i << "/" << S.size() << endl;
-        while (Pi.size() < M && it != S.end()) {
-            Pi.insert(*it);
-            it++;
-            //	++i;
+    clock_t begin = clock();
+    vector<string> D = compute_P();
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    cout << elapsed_secs << endl;
+
+
+    int k = 0;
+    while(k < S.size()) {
+        unordered_set<string> Pi;
+        vector<string> Dn;
+        while (Pi.size() < M && k != S.size()) {
+            Pi.insert(S[k]);
+            k++;
         }
 
-        for (set<string>::iterator m = D.begin(); m != D.end(); ++m) {
-            if (Pi.count(canonical(*m)) == 0) {
-                Dn.insert(canonical(*m));
+        for (int i = 0; i != D.size(); ++i) {
+            if (Pi.count(canonical(D[i])) == 0) {
+                Dn.push_back(canonical(D[i]));
             } //else delete
         }
 
-        D = set<string>(Dn);
+        D = Dn;
     }
-
-    cFP = set<string>(D);
-    //cout << cFP.size() << endl;
-    vector<string> tmp(S.begin(), S.end());
-    nodes = tmp;
+    unordered_set<string> d(D.begin(), D.end());
+    cFP = d;
 }
 
 /*
@@ -101,27 +110,28 @@ void dbg::traverse_graph(string name) {
 
     int index = 0;
 
-    while (index < nodes.size()) {
+    while (index < S.size()) {
         int depth = 0;
         int reason = -1;
-        for (int tt = 0; tt != 2; ++tt) { // tt=0 go only left from nodes[index], tt=1 only right 
-            set<string> front;
-            front.insert(nodes[index]);
-            bool l = !tt, r = tt;
+        vector<string> tmp;
+        for (int right = 0; right != 2; ++right) { // tt=0 go only left from S[index], tt=1 only right 
+            vector<string> front;
+            front.push_back(S[index]);
 
             do {
-                set<string> new_front;
+                vector<string> new_front;
 
-                for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
-                    set<string> ret = branch(*it, l, r);
-                    new_front.insert(ret.begin(), ret.end());
-                    if (r) {
-                        marked.insert((*it).substr((*it).size()-k_size));
-                        marked.insert(reverse_complement((*it).substr((*it).size()-k_size)));
+                for (int i = 0; i != front.size(); ++i) {
+                    vector<string> ret = branch(front[i], right);
+
+                    new_front.insert(new_front.end(), ret.begin(), ret.end());
+                    if (right) {
+                        marked.insert(front[i].substr(front[i].size()-k_size));
+                        marked.insert(reverse_complement(front[i].substr(front[i].size()-k_size)));
                     }
-                    if (l) {
-                        marked.insert((*it).substr(0,k_size));
-                        marked.insert(reverse_complement((*it).substr(0,k_size)));
+                    if (!right) {
+                        marked.insert(front[i].substr(0,k_size));
+                        marked.insert(reverse_complement(front[i].substr(0,k_size)));
                     }
                 }
 
@@ -137,7 +147,7 @@ void dbg::traverse_graph(string name) {
                 }
                 front = new_front;
                 if (new_front.size() == 1) {
-                    set<string> ret = branch(*(new_front.begin()), l, r);
+                    vector<string> ret = branch(new_front[0], right);
                     if (ret.size() >= 1) {
                         continue;
                     }
@@ -145,35 +155,41 @@ void dbg::traverse_graph(string name) {
                     break;
                 }
             } while (1);
-            if (reason != -1) {
-                for (set<string>::iterator it = front.begin(); it != front.end(); ++it) {
-                    //cout << "contig: " << *it << " " <<reverse_complement(*it) <<  endl;
 
-                    if ((*it).size() > 2 * k_size + 1) {
-                        //  cout << "contig: " << *it << " " <<reverse_complement(*it) <<  endl;
-                        contigs.insert(*it);
-                    }
+            if (right == 0 && reason != -1) { // remember contigs found going left
+                for (int i = 0; i != front.size(); ++i) {
+                    tmp.push_back(front[i]);
+                }
+            }
+
+            if (right == 1 && reason != -1) { // merge right with left contigs
+                for (int i = 0; i != front.size(); ++i) {
+                    for (int j = 0; j != tmp.size(); ++j) {
+                        if (front[i].size() + tmp[j].size()-k_size > 2 * k_size + 1) {
+                            contigs.push_back(tmp[j] + front[i].substr(k_size));
+                        }
+                    }   
                 }
             }
         }
 
         index += 1;
 
-        for (int i = index; i < nodes.size(); ++i) {
-            if(!marked.count(nodes[i])) {
+        for (int i = index; i < S.size(); ++i) {
+            if(!marked.count(S[i])) {
                 index = i;
                 break;
             }
-            if (i == nodes.size()-1) {
-                index = nodes.size();
+            if (i == S.size()-1) {
+                index = S.size();
             }
         }
     }
 
     ofstream myfile;
     myfile.open (name);
-    for (set<string>::iterator it = contigs.begin(); it != contigs.end(); ++it) {
-        myfile << *it << endl;
+    for (int i = 0; i != contigs.size(); ++i) {
+        myfile << contigs[i] << endl;
     }
     myfile.close();
 }
@@ -183,28 +199,27 @@ void dbg::traverse_graph(string name) {
  * to the left and right if corresponding flags: left and right
  * are true
  */
-set<string> dbg::branch(string s, bool left, bool right) {
+vector<string> dbg::branch(string s, bool right) {
 
-    char bla[4] = {'A', 'C', 'G', 'T'};
-    list<char> l(bla, bla + sizeof(bla) / sizeof(char));
-    set<string> ret;
-    if (left) {
-        for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
-            string h = *c + s.substr(0, k_size - 1);
-            if (left && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
-                ret.insert(*c + s);
+    char c[4] = {'A', 'C', 'G', 'T'};
+    vector<string> ret;
+    if (!right) {
+        for (int i = 0; i != 4; ++i) {
+            string h = c[i] + s.substr(0, k_size - 1);
+            if (!right && filter.contains(h.c_str()) && !cFP.count(canonical(h)) && !marked.count(h)) {
+                ret.push_back(c[i] + s);
             }
         }
     }
+
     if (right) {
-        for (list<char>::iterator c = l.begin(); c != l.end(); ++c) {
-            string h = s.substr(s.size() - k_size + 1) + *c;
-            if (right && filter.contains(h) && !cFP.count(canonical(h)) && !marked.count(h)) {
-                ret.insert(s + *c);
+        for (int i = 0; i != 4; ++i) {
+            string h = s.substr(s.size() - k_size + 1) + c[i];
+            if (right && filter.contains(h.c_str()) && !cFP.count(canonical(h)) && !marked.count(h)) {
+                ret.push_back(s + c[i]);
             }
         }
     }
-
     return ret;
 }
 
@@ -243,3 +258,10 @@ string dbg::complement(string c) {
         return "C";
     return "";
 }
+
+void dbg::test_size() {
+    // size_t bits_per_kmer = cFP.size()*sizeof(*cFP.begin())*8/float(S.size());
+    // cout << "Critical false positive size: " << bits_per_kmer << endl;
+    // cout << "Bloom filter size: " << sizeof(filter) << endl;
+}
+

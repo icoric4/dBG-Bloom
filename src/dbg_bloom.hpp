@@ -5,12 +5,16 @@
 #include <string>
 #include <fstream>
 #include <set>
-#include "bloom_filter.hpp"
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <list>
+#include <ctime>
+#include <sstream>
+#include "KmerBloomFilter.hpp"
+
+
 
 using namespace std;
-
 
 /* 
  * Class that builds space efficient and exact de Brujin graph
@@ -23,20 +27,21 @@ public:
 	void compute_cFP(unsigned int M=1e9);
 	void traverse_graph(string name="contigs.txt");
 	string reverse_complement (string s);
+	void test_size();
 
 private:
 	string input_file_name;
-	set<string> S;
-	bloom_filter filter;
-	set<string> P;
-	set<string> cFP;
-	vector<string> nodes;
-	set<string> marked;
+	vector<string> S;
+	//bloom_filter filter;
+	KmerBloomFilter filter;
+	unordered_set<string> cFP;
+	unordered_set<string> marked;
 	int k_size;
-	set<string> contigs;
+	vector<string> contigs;
+
 	void create_BF();
-	void compute_P();
-	set<string> branch(string s, bool left, bool right);
+	vector<string> compute_P();
+	vector<string> branch(string s, bool right);
 	string canonical (string s1);
 	string complement(string c);
 };
