@@ -23,7 +23,7 @@ void dbg::create_BF() {
     const unsigned numHashes = 10;
     const unsigned size = 1e9;
     filter = KmerBloomFilter(size, numHashes, k);
-    for (int i = 0; i != S.size(); ++i)	{
+    for (int i = 0; i != S.size(); ++i) {
         filter.insert(S[i].c_str());
         filter.insert(reverse_complement(S[i]).c_str());
     }
@@ -34,32 +34,18 @@ void dbg::create_BF() {
  * set S for which the Bloom filter answers yes.
  */
 vector<string> dbg::compute_P() {
-    string h[] = {"A","C","G","T"};
-    char hc[] = {'A', 'C', 'G', 'T'};
+    string c[] = {"A","C","G","T"};
     unordered_set<string> P;
-    stringstream ss;
-    char end; 
-    string start;
-    for (int i = 0; i != S.size(); ++i) { // a bit uglier code to avoid usage of string::operator+ to save time
-        end = S[i][(S[i].size()-1)];
-        ss << S[i][0];
-        ss >> start;
+    for (int i = 0; i != S.size(); ++i) {
         for (int j = 0; j != 4; ++j) {
-            S[i].pop_back();
-            S[i].insert(0,h[j]);
-            if (filter.contains(S[i].c_str())) {
-                P.insert(canonical(S[i]));
+            string h = S[i].substr(1) + c[j];
+            if (filter.contains(h.c_str())) {
+                P.insert(canonical(h));
             }
-            S[i].erase(S[i].begin());
-            S[i].push_back(end);
-
-            S[i].erase(S[i].begin());
-            S[i].push_back(hc[j]);
-            if (filter.contains(S[i].c_str())) {
-                P.insert(canonical(S[i]));
+            h = c[j]+S[i].substr(0,S[i].size()-1);
+            if (filter.contains(h.c_str())) {
+                P.insert(canonical(h));
             }
-            S[i].pop_back();
-            S[i].insert(0,start);
         }
     }
     vector<string> ret(P.begin(),P.end());
@@ -156,13 +142,13 @@ void dbg::traverse_graph(string name) {
                 }
             } while (1);
 
-            if (right == 0 && reason != -1) { // remember contigs found going left
+            if (right == 0) { // remember contigs found going left
                 for (int i = 0; i != front.size(); ++i) {
                     tmp.push_back(front[i]);
                 }
             }
 
-            if (right == 1 && reason != -1) { // merge right with left contigs
+            if (right == 1) { // merge right with left contigs
                 for (int i = 0; i != front.size(); ++i) {
                     for (int j = 0; j != tmp.size(); ++j) {
                         if (front[i].size() + tmp[j].size()-k_size > 2 * k_size + 1) {
