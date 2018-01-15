@@ -20,7 +20,7 @@ dbg::dbg(string name) {
  */
 void dbg::create_BF() {
     const unsigned k = k_size;
-    const unsigned numHashes = 10;
+    const unsigned numHashes = 4;
     const unsigned size = 1e9;
     filter = KmerBloomFilter(size, numHashes, k);
     for (int i = 0; i != S.size(); ++i) {
@@ -57,13 +57,9 @@ vector<string> dbg::compute_P() {
  * formally defined as cFP = P\S
  */
 void dbg::compute_cFP(unsigned int M) {
-    clock_t begin = clock();
+    
     vector<string> D = compute_P();
-    clock_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    cout << elapsed_secs << endl;
-
-
+    
     int k = 0;
     while(k < S.size()) {
         unordered_set<string> Pi;
@@ -97,64 +93,109 @@ void dbg::traverse_graph(string name) {
     int index = 0;
 
     while (index < S.size()) {
-        int depth = 0;
-        int reason = -1;
-        vector<string> tmp;
-        for (int right = 0; right != 2; ++right) { // tt=0 go only left from S[index], tt=1 only right 
-            vector<string> front;
-            front.push_back(S[index]);
 
-            do {
+        string start;
+        vector<string> vs;
+        for (int right = 0; right != 2; ++right) { // right=0 go only left from S[index], tt=1 only right
+            int depth = 0, first_not_single = -1;
+            vector<string> front; front.push_back(S[index]); start = S[index];
+            vector<set<char> > mem;
+            do { // branch in one direction, store new kmers in new_front, remember nucleotides in mem
                 vector<string> new_front;
-
                 for (int i = 0; i != front.size(); ++i) {
-                    vector<string> ret = branch(front[i], right);
-
-                    new_front.insert(new_front.end(), ret.begin(), ret.end());
-                    if (right) {
-                        marked.insert(front[i].substr(front[i].size()-k_size));
-                        marked.insert(reverse_complement(front[i].substr(front[i].size()-k_size)));
+                    vector<char> ret = branch(front[i], right);
+                    if (i == 0) { // init mem
+                        set<char> sc(ret.begin(),ret.end());
+                        mem.push_back(sc);
                     }
-                    if (!right) {
-                        marked.insert(front[i].substr(0,k_size));
-                        marked.insert(reverse_complement(front[i].substr(0,k_size)));
+
+                    for (int j = 0; j != ret.size(); ++j) { // construct new kmers
+                        string h;
+                        if (right) {
+                            h = front[i] + ret[j];
+                            h.erase(0, 1);
+                        } else {
+                            h = ret[j] + front[i];
+                            h.pop_back();
+                        }
+                        new_front.push_back(h); // save them
+                        if (j != 0) {
+                            mem[depth].insert(ret[j]); // save nucleotide
+                        }
+                    }
+                    marked.insert(front[i]); // mark as used 
+                    marked.insert(reverse_complement(front[i])); // mark as used
+                }
+
+                if (new_front.size() > 1 && first_not_single == -1) { // if more than one option, remember to update later when correct one is chosen
+                        first_not_single = depth;
+                } else if (first_not_single != -1) {
+                    if (mem[first_not_single].size() > new_front.size()) { // we got less options than before and make an update
+                        for(int j = first_not_single; j < depth && mem[j].size() != 1; ++j) { // all of them must have more options than current new_front, so trim them
+                            set<char> sc;
+                            for(int k = 0; k != new_front.size(); ++k) {
+                                sc.insert(new_front[k][new_front[k].size()-1-(depth-j)]);
+                            }
+                            mem[j] = sc;
+                            if (sc.size() == 1) {
+                                first_not_single++;
+                            }
+                        }
+                        if (mem[first_not_single].size()==1) {
+                            first_not_single = -1;
+                        }
                     }
                 }
 
+
                 if (new_front.empty()) {
-                    reason = 2;
                     break;
                 }
                 depth++;
-
-                if (depth > 1e6) {
-                    reason = 0;
+                int width = new_front.size();
+                if (depth > 1e6 || width > 20) {
                     break;
                 }
                 front = new_front;
                 if (new_front.size() == 1) {
-                    vector<string> ret = branch(new_front[0], right);
+                    vector<char> ret = branch(new_front[0], right);
                     if (ret.size() >= 1) {
                         continue;
                     }
-                    reason = 1;
                     break;
                 }
             } while (1);
 
-            if (right == 0) { // remember contigs found going left
-                for (int i = 0; i != front.size(); ++i) {
-                    tmp.push_back(front[i]);
+            if (right == 0) { // remember contigs found going left in vs
+                vs.push_back(start);
+                for (int i = 0; i != mem.size(); ++i) {
+                    vector<string> tmp;
+                    for (int j = 0; j != vs.size(); ++j) {
+                        for (set<char>::iterator it = mem[i].begin(); it != mem[i].end(); ++it) {
+                            tmp.push_back(*it+vs[j]);
+                        }
+                    }
+                    vs = tmp;
                 }
             }
 
             if (right == 1) { // merge right with left contigs
-                for (int i = 0; i != front.size(); ++i) {
-                    for (int j = 0; j != tmp.size(); ++j) {
-                        if (front[i].size() + tmp[j].size()-k_size > 2 * k_size + 1) {
-                            contigs.push_back(tmp[j] + front[i].substr(k_size));
+                vector<string> rs = vs;
+                for (int i = 0; i != mem.size(); ++i) {
+                    vector<string> tmp;
+                    for (int j = 0; j != rs.size(); ++j) {
+                        for (set<char>::iterator it = mem[i].begin(); it != mem[i].end(); ++it) {
+                            tmp.push_back(rs[j] + *it);
                         }
-                    }   
+                    }
+                    rs = tmp;
+                }
+
+
+                for (int i = 0; i != rs.size(); ++i) {
+                        if (rs[i].size() > 2 * k_size + 1) {
+                            contigs.push_back(rs[i]);
+                        }
                 }
             }
         }
@@ -185,15 +226,15 @@ void dbg::traverse_graph(string name) {
  * to the left and right if corresponding flags: left and right
  * are true
  */
-vector<string> dbg::branch(string s, bool right) {
+vector<char> dbg::branch(string s, bool right) {
 
     char c[4] = {'A', 'C', 'G', 'T'};
-    vector<string> ret;
+    vector<char> ret;
     if (!right) {
         for (int i = 0; i != 4; ++i) {
             string h = c[i] + s.substr(0, k_size - 1);
             if (!right && filter.contains(h.c_str()) && !cFP.count(canonical(h)) && !marked.count(h)) {
-                ret.push_back(c[i] + s);
+                ret.push_back(c[i]);
             }
         }
     }
@@ -202,7 +243,7 @@ vector<string> dbg::branch(string s, bool right) {
         for (int i = 0; i != 4; ++i) {
             string h = s.substr(s.size() - k_size + 1) + c[i];
             if (right && filter.contains(h.c_str()) && !cFP.count(canonical(h)) && !marked.count(h)) {
-                ret.push_back(s + c[i]);
+                ret.push_back(c[i]);
             }
         }
     }
@@ -244,10 +285,3 @@ string dbg::complement(string c) {
         return "C";
     return "";
 }
-
-void dbg::test_size() {
-    // size_t bits_per_kmer = cFP.size()*sizeof(*cFP.begin())*8/float(S.size());
-    // cout << "Critical false positive size: " << bits_per_kmer << endl;
-    // cout << "Bloom filter size: " << sizeof(filter) << endl;
-}
-

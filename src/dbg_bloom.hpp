@@ -27,7 +27,6 @@ public:
 	void compute_cFP(unsigned int M=1e9);
 	void traverse_graph(string name="contigs.txt");
 	string reverse_complement (string s);
-	void test_size();
 
 private:
 	string input_file_name;
@@ -41,7 +40,7 @@ private:
 
 	void create_BF();
 	vector<string> compute_P();
-	vector<string> branch(string s, bool right);
+	vector<char> branch(string s, bool right);
 	string canonical (string s1);
 	string complement(string c);
 };
