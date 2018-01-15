@@ -5,7 +5,7 @@ cd jellyfish-2.2.6
 make
 make install
 cd ".."
-rm jellyfish-2.2.6
+rm -r jellyfish-2.2.6
 mkdir "bin"
 cp $var/jellyfish/bin/jellyfish bin
 cd "test"
