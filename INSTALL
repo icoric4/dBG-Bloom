@@ -5,8 +5,8 @@ cd jellyfish-2.2.6
 make
 make install
 cd ".."
+rm jellyfish-2.2.6
 mkdir "bin"
-chmod o+r $var/jellyfish/bin/jellyfish 
 cp $var/jellyfish/bin/jellyfish bin
 cd "test"
 g++ "test.cpp" ../src/dbg_bloom.cpp -o "test"
