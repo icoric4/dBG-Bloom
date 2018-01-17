@@ -21,6 +21,7 @@ int main (int argc, char *argv[]) {
 	double time = double(end - start) / CLOCKS_PER_SEC;
 	cout << "Statistics: " << endl;
 	cout << setw (30) << "Time : " << time << " s." << endl;
+	d.test_size();
 
 	ifstream ifs("contigs.txt");
 	ifstream ifs2(argv[2]);
