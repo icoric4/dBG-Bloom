@@ -1,5 +1,8 @@
 #include "../src/dbg_bloom.hpp"
 #include <ctime>
+#include <iomanip>
+#include <cstdio>
+#include <iostream>
 
 using namespace std;
 
@@ -10,10 +13,15 @@ using namespace std;
  * k-mers was created
  */
 int main (int argc, char *argv[]) {
-
+	clock_t start = clock();
 	dbg d(argv[1]);
 	d.compute_cFP();
 	d.traverse_graph();
+	clock_t end = clock();
+	double time = double(end - start) / CLOCKS_PER_SEC;
+	cout << "Statistics: " << endl;
+	cout << setw (30) << "Time : " << time << " s." << endl;
+
 	ifstream ifs("contigs.txt");
 	ifstream ifs2(argv[2]);
 	string dna;
@@ -25,9 +33,9 @@ int main (int argc, char *argv[]) {
 		read = true;
 		if (dna.find(s)==string::npos && dna.find(d.reverse_complement(s))==string::npos) {
 			bool passed = false;
-			for (int i = 1; i != 2; ++i) { 	// maybe contig came to the end of original dna and unmarked kmer existed, 
+			for (int i = 1; i != 3; ++i) { 	// maybe contig came to the end of original dna and unmarked kmer existed, 
 											// such that it managed to add a nucleotide to its end, this can happen more times, 
-											// but eventually it stops (after 5 times we hope) 
+											// but eventually it stops (after 2 or 3 times we hope) 
 				string ss = s.substr(0,s.size()-i);
 				if (dna.find(ss)!=string::npos || dna.find(d.reverse_complement(ss))!=string::npos) {
 					passed = true;

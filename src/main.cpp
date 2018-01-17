@@ -36,17 +36,24 @@ void help () {
 
 int main(int argc, char *argv[]) {
 
+	clock_t start = clock();
 	CSimpleOpt::SOption g_rgOptions[] = {
 	{ 0, "-in", SO_REQ_SEP },     // "-a"
 	{ 1, "-k", SO_REQ_SEP },     // "-b"
-	{ 2,  "-out", SO_REQ_SEP },  // "-f ARG"
+	{ 2, "-out", SO_REQ_SEP },  // "-f ARG"
 	{ 3, "--help", SO_NONE }, // "--help"
+	{ 4, "-depth-bound", SO_REQ_SEP},
+	{ 5, "-width-bound", SO_REQ_SEP},
+	{ 6, "-abundance-min", SO_REQ_SEP},
 	SO_END_OF_OPTIONS                // END
 	};
 	CSimpleOpt args(argc, argv, g_rgOptions);
 	int k = 31;
 	string out = "contigs.txt";
 	string in = "";
+	int depth = 500;
+	int width = 20;
+	int abundance_min = 3;
 	while (args.Next()) {
 		if (args.LastError() == SO_SUCCESS) {
 			// handle option: use OptionId(), OptionText() and OptionArg()
@@ -59,6 +66,12 @@ int main(int argc, char *argv[]) {
 					break;
 				case 3 : help(); exit(0);
 					break;
+				case 4 : depth = atoi(args.OptionArg());
+					break;
+				case 5 : width = atoi(args.OptionArg());
+					break;	
+				case 6 : abundance_min = atoi(args.OptionArg());
+					break;	
 			}
 		} else {
 			cout << "ERROR" << endl << "For options usage, please see help using --help option." << endl;
@@ -70,7 +83,8 @@ int main(int argc, char *argv[]) {
 		exit(1); 
 	}
 
-	string cmd = "./jellyfish count -m " + to_string(k) +" -s 100M -t 10 -C -L 1 " + in +" -o tmp.jf";
+	string cmd = "./jellyfish count -m " + to_string(k) +" -s 100M -t 10 -C -L " 
+									+to_string(abundance_min)+" " + in +" -o tmp.jf";
 	exec(cmd.c_str());
 	cmd = "./jellyfish dump tmp.jf > tmp.fa";
 	exec(cmd.c_str());
@@ -82,21 +96,16 @@ int main(int argc, char *argv[]) {
 	exec(cmd.c_str());
 	
 	dbg d("tmpS.txt");
-	clock_t begin = clock();
 	d.compute_cFP();
-	clock_t end = clock();
-  	double cFP_time = double(end - begin) / CLOCKS_PER_SEC;
-  	
   	cmd = "rm tmpS.txt";
 	exec(cmd.c_str());
 
-  	begin = clock();
-	d.traverse_graph(out);
-	end = clock();
-	double assembly = double(end - begin) / CLOCKS_PER_SEC;
+	d.traverse_graph(out, depth, width);
+	clock_t end = clock();
+	double time = double(end - start) / CLOCKS_PER_SEC;
 	cout << "Statistics: " << endl;
-	cout << setw (30) << "Counting false positives : " << cFP_time << " s." << endl;
-	cout << setw (30) << "Assembly : " << assembly << " s." << endl;
+	cout << setw (30) << "Time : " << time << " s." << endl;
+	d.test_size();
 
 }
 
