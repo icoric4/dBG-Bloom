@@ -14,7 +14,7 @@ This program was created as a project assignment for Bioinformatics class at Fac
     sh INSTALL
 
 
-# User manual	 
+# Usage instructions	 
 
 Type `./dbg --help` for usage instructions.
 
