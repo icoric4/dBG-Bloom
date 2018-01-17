@@ -1,6 +1,6 @@
 ./test_generator
 
-for i in {1..7} 
+for i in {1..10} 
 do
 	./parse 'data'$i'.txt'
 	rm 'data'$i'.txt'
