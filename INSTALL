@@ -9,12 +9,12 @@ rm -r jellyfish-2.2.6
 mkdir "bin"
 cp $var/jellyfish/bin/jellyfish bin
 cd "test"
-g++ "test.cpp" ../src/dbg_bloom.cpp -o "test"
-g++ test_generator.cpp -o test_generator 
-g++ parse_to_fasta.cpp -o parse
-g++ real_data.cpp -o create_s
+g++ -std=c++11 "test.cpp" ../src/dbg_bloom.cpp -o "test"
+g++ -std=c++11 test_generator.cpp -o test_generator 
+g++ -std=c++11 parse_to_fasta.cpp -o parse
+g++ -std=c++11 real_data.cpp -o create_s
 cd ".."
 
 cd src
-g++ main.cpp dbg_bloom.cpp -o dbg
+g++ -std=c++11 main.cpp dbg_bloom.cpp -o dbg
 mv dbg ../bin/dbg
