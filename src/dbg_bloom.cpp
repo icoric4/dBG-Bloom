@@ -323,7 +323,5 @@ void dbg::test_size() {
     cout << setw (30) << "cFP space : " << space << " MB." << endl;
     space = bloom_size/(8*1024.*1024.);
     cout << setw (30) << "Bloom filter space : " << space << " MB." << endl;
-    space = marked.size()*k_size/(1024.*1024);
-    cout << setw (30) << "Marking structure space : " << space << " MB." << endl;
 }
 
