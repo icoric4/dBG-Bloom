@@ -2,7 +2,7 @@
 
 Space-efficient and exact de Bruijn graph representation based on a Bloom filter.
 
-This program was created as a project assignment for Bioinformatics class at Faculty of Electrical Engineering and Computing, University of Zagreb.
+This program was created as a project assignment for Bioinformatics class at Faculty of Electrical Engineering and Computing, University of Zagreb (http://www.fer.unizg.hr/predmet/bio).
 
 ## Instructions
 
